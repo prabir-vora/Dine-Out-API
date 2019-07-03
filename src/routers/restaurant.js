@@ -2,7 +2,7 @@ const express = require('express')
 const Restaurant = require('../model/restaurant')
 const userauth = require('../middleware/auth')
 const router = new express.Router()
-const getTravelTime = require('../googleAPI/distanceMatrix')
+const { getTravelTimeParralel } = require('../googleAPI/distanceMatrix')
 
 router.post('/restaurant', async (req, res) => {
     const restaurant = new Restaurant( req.body )
@@ -63,17 +63,48 @@ router.get('/restaurants/location', userauth, async (req, res) => {
         if (!restaurants) {
             throw new Error( {error: "No results Found"})
         }
-
-        let modifiedRestaurants = []
-
-        for (let i = 0; i < restaurants.length; i++) {
-            const newRest = await getTravelTime(req.user, restaurants[i])
-            modifiedRestaurants.push(newRest)
-        }
         
+        //This code was for parallel implementation using getTravelTimeParallel... much faster than sequential implementation 
 
-        console.log(modifiedRestaurants)
-        res.send(modifiedRestaurants)
+        let completed = 0, hasErrors = false 
+
+        function done(err) {
+            if(err) {
+                hasErrors = true;
+                throw new Error(err);
+            }
+
+            if(++completed === restaurants.length && !hasErrors) {
+                res.send(restaurants)
+            }
+        }
+
+        
+        getTravelTimeParralel(req.user, restaurants, done)
+
+        //This code was for sequential non-recursive implementation using getTravelTime
+
+        // let modifiedRestaurants = []
+
+        // for (let i = 0; i < restaurants.length; i++) {
+        //     const newRest = await getTravelTime(req.user, restaurants[i])
+        //     modifiedRestaurants.push(newRest)
+        // }
+
+        // console.log(modifiedRestaurants)
+        // res.send(modifiedRestaurants)
+
+
+        //This code was for sequential recursive implementation using getTravelTimeRecursive
+
+        // getTravelTimeRecursive(req.user, restaurants, (err) => {
+        //     if (err) {
+        //         throw new Error(err)
+        //     } 
+
+        //     res.send(restaurants)
+        // })
+
     } catch (e) {
         res.status(400).send(e)
     }
